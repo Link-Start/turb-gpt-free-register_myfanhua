@@ -545,6 +545,31 @@ def generate_registration_password(length: int = 14) -> str:
     return "".join(chars)
 
 
+def navigate_create_account_password(
+    session: BrowserSession,
+    current_url: str | None = None,
+) -> str:
+    """进入注册密码页，确保协议注册不再走无密码 OTP 分支。"""
+    current = str(current_url or "")
+    if "/create-account/password" in current:
+        return current
+
+    url = "https://auth.openai.com/create-account/password"
+    referer = current if current.startswith("https://auth.openai.com/") else "https://auth.openai.com/"
+    headers = session.get_auth_navigate_headers(referer=referer)
+    headers["sec-fetch-site"] = "same-origin"
+    headers["sec-fetch-user"] = "?1"
+    logger.info("[步骤5] 切换到创建账号密码页...")
+    resp = session.get(url, headers=headers, allow_redirects=True)
+    resp.raise_for_status()
+    _rotate_document_navigation_id(session)
+    final_url = str(getattr(resp, "url", "") or url)
+    if "/create-account/password" not in final_url:
+        raise RuntimeError(f"无法进入注册密码页，最终落点: {final_url}")
+    logger.info("[步骤5] 已进入创建账号密码页")
+    return final_url
+
+
 def register_user(
     session: BrowserSession,
     email: str,
